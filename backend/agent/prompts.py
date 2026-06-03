@@ -2,10 +2,33 @@ PLAN_PROMPT = """You are a research planning assistant. Given a research questio
 
 Research Question: {question}
 
+Good sub-queries are specific, search-engine friendly, and cover distinct angles of the question (definitions, current state, data/statistics, competing viewpoints, recent developments).
+
 Return your response as a JSON array of strings, each being a specific search query.
 Example: ["query 1", "query 2", "query 3"]
 
 Return ONLY the JSON array, no other text."""
+
+REFLECT_PROMPT = """You are a meticulous research supervisor. Your job is to decide whether the evidence gathered so far is SUFFICIENT to write a thorough, well-grounded report answering the main question — or whether targeted follow-up searches are still needed.
+
+Main Question: {question}
+
+Searches already run:
+{executed_queries}
+
+Evidence gathered so far (titles + snippets):
+{evidence}
+
+Critically assess the evidence. Consider:
+- Are the core aspects of the question actually covered, or only touched superficially?
+- Are there obvious knowledge gaps, missing data points, or unexplored angles?
+- Is there conflicting information that needs corroboration from another source?
+
+If the evidence is sufficient, set "sufficient" to true and return no new queries.
+If NOT sufficient, identify the specific gaps and propose 1-3 NEW search queries that target those gaps. Do NOT repeat queries that were already run.
+
+Return ONLY a JSON object in exactly this shape, no other text:
+{{"sufficient": true|false, "gaps": ["gap 1", "gap 2"], "new_queries": ["follow-up query 1"]}}"""
 
 ANALYZE_PROMPT = """You are a research analyst. Analyze the following search results gathered from multiple queries related to the main research question.
 

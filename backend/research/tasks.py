@@ -35,18 +35,20 @@ def run_research_task(self, query_id):
 
         send_ws_update(query_id, "status", "processing", "Starting research...")
 
-        def status_callback(stage, node_name):
-            stage_messages = {
-                "planning": "Breaking down your question into sub-queries...",
-                "searching": "Searching the web for information...",
-                "analyzing": "Analyzing search results...",
-                "formatting": "Formatting the final report...",
-            }
+        stage_messages = {
+            "planning": "Breaking down your question into sub-queries...",
+            "searching": "Searching the web for information...",
+            "reflecting": "Reflecting on the evidence gathered so far...",
+            "analyzing": "Analyzing search results...",
+            "formatting": "Formatting the final report...",
+        }
+
+        def status_callback(stage, detail="", meta=None):
             send_ws_update(
                 query_id,
                 "status",
                 stage,
-                stage_messages.get(stage, f"Running {node_name}..."),
+                detail or stage_messages.get(stage, f"Working: {stage}..."),
             )
 
         from agent.graph import run_research
@@ -60,6 +62,9 @@ def run_research_task(self, query_id):
             sub_queries=result_state.get("sub_queries", []),
             raw_data={
                 "analysis": result_state.get("analysis", ""),
+                "iterations": result_state.get("iteration", 0),
+                "knowledge_gaps": result_state.get("knowledge_gaps", []),
+                "executed_queries": result_state.get("executed_queries", []),
             },
         )
 
