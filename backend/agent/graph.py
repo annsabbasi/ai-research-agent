@@ -3,6 +3,7 @@ from typing import Any, TypedDict
 from langgraph.graph import END, StateGraph
 
 from .nodes import analyze_node, format_node, plan_node, reflect_node, search_node
+from .streaming import set_token_sink
 
 
 class ResearchState(TypedDict, total=False):
@@ -63,15 +64,23 @@ def build_graph():
     return workflow.compile()
 
 
-def run_research(question: str, status_callback=None, max_iterations: int = 2) -> dict:
+def run_research(
+    question: str,
+    status_callback=None,
+    token_callback=None,
+    max_iterations: int = 2,
+) -> dict:
     """Run the agentic research graph.
 
     Args:
         question: the user's research question.
         status_callback: optional callable(stage, detail, meta) invoked at each
             node so the caller can stream progress (e.g. over a WebSocket).
+        token_callback: optional callable(delta) invoked for each token of the
+            final report as it is generated, enabling live streaming to the UI.
         max_iterations: hard cap on reflection/search loops (cost + latency guard).
     """
+    set_token_sink(token_callback)
     graph = build_graph()
     initial_state: ResearchState = {
         "question": question,

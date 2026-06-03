@@ -3,6 +3,7 @@ import json
 from langchain_openai import ChatOpenAI
 
 from .prompts import ANALYZE_PROMPT, FORMAT_PROMPT, PLAN_PROMPT, REFLECT_PROMPT
+from .streaming import emit_token
 from .tools import search_web
 
 
@@ -185,15 +186,24 @@ def format_node(state: dict) -> dict:
         f"- [{s['title']}]({s['url']})" for s in sources if s.get("url")
     )
 
-    response = llm.invoke(
-        FORMAT_PROMPT.format(
-            question=question, analysis=analysis, sources=sources_text
-        )
+    prompt = FORMAT_PROMPT.format(
+        question=question, analysis=analysis, sources=sources_text
     )
+
+    # Stream the report token-by-token so the caller can forward each delta to
+    # the UI in real time. We accumulate the full text to persist at the end.
+    parts: list[str] = []
+    for chunk in llm.stream(prompt):
+        token = chunk.content or ""
+        if token:
+            parts.append(token)
+            emit_token(token)
+
+    report = "".join(parts)
 
     return {
         **state,
-        "report": response.content,
+        "report": report,
         "stage": "formatting",
         "stage_detail": "Writing the final structured report...",
     }
