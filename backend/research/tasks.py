@@ -5,23 +5,34 @@ from celery import shared_task
 from channels.layers import get_channel_layer
 from django.core.cache import cache
 
+from agent.streaming import TokenBatcher
+
 logger = logging.getLogger(__name__)
 
 
-def send_ws_update(query_id, message_type, status, detail="", data=None):
+def _group_send(query_id, payload):
+    """Forward a payload dict to the query's WebSocket group.
+
+    The consumer's `research_update` handler re-broadcasts whatever is under
+    the "message" key, so this is the single choke point for all WS traffic.
+    """
     channel_layer = get_channel_layer()
-    group_name = f"research_{query_id}"
-    message = {
-        "type": "research.update",
-        "message": {
-            "type": message_type,
-            "status": status,
-            "detail": detail,
-        },
-    }
+    async_to_sync(channel_layer.group_send)(
+        f"research_{query_id}",
+        {"type": "research.update", "message": payload},
+    )
+
+
+def send_ws_update(query_id, message_type, status, detail="", data=None):
+    payload = {"type": message_type, "status": status, "detail": detail}
     if data:
-        message["message"]["data"] = data
-    async_to_sync(channel_layer.group_send)(group_name, message)
+        payload["data"] = data
+    _group_send(query_id, payload)
+
+
+def send_ws_token(query_id, delta):
+    """Push a chunk of the streaming report to the browser."""
+    _group_send(query_id, {"type": "token", "delta": delta})
 
 
 @shared_task(bind=True, max_retries=2, acks_late=True)
@@ -51,9 +62,17 @@ def run_research_task(self, query_id):
                 detail or stage_messages.get(stage, f"Working: {stage}..."),
             )
 
+        # Batch streamed report tokens to limit channel-layer round-trips.
+        batcher = TokenBatcher(lambda text: send_ws_token(query_id, text))
+
         from agent.graph import run_research
 
-        result_state = run_research(query.question, status_callback=status_callback)
+        result_state = run_research(
+            query.question,
+            status_callback=status_callback,
+            token_callback=batcher.add,
+        )
+        batcher.flush()  # emit any tokens left in the buffer
 
         result = ResearchResult.objects.create(
             query=query,

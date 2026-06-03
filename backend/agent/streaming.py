@@ -38,3 +38,30 @@ def emit_token(text: str) -> None:
     except Exception:
         # Streaming is best-effort; the full report is still saved at the end.
         pass
+
+
+class TokenBatcher:
+    """Coalesces streamed tokens into small batches before flushing.
+
+    One transport round-trip per LLM token would flood the WebSocket/channel
+    layer. This buffers deltas and flushes when the buffer reaches `min_chars`
+    or a newline arrives, which stays visually smooth while cutting round-trips.
+    The caller MUST call `flush()` once at the end to emit any remainder.
+    """
+
+    def __init__(self, flush: Callable[[str], None], min_chars: int = 24):
+        self._flush = flush
+        self._min_chars = min_chars
+        self._buffer: list[str] = []
+
+    def add(self, delta: str) -> None:
+        if not delta:
+            return
+        self._buffer.append(delta)
+        if sum(len(t) for t in self._buffer) >= self._min_chars or "\n" in delta:
+            self.flush()
+
+    def flush(self) -> None:
+        if self._buffer:
+            self._flush("".join(self._buffer))
+            self._buffer.clear()
