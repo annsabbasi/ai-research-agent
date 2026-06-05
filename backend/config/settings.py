@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     # Local
     "accounts",
     "research",
+    "documents",
 ]
 
 MIDDLEWARE = [
@@ -97,6 +98,15 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+# RAG / Embeddings
+# Model + dimensions must stay in sync with the VectorField size in the
+# documents app. text-embedding-3-small is cheap and 1536-dimensional.
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-small")
+EMBEDDING_DIMENSIONS = int(os.environ.get("EMBEDDING_DIMENSIONS", "1536"))
+RAG_CHUNK_SIZE = int(os.environ.get("RAG_CHUNK_SIZE", "800"))
+RAG_CHUNK_OVERLAP = int(os.environ.get("RAG_CHUNK_OVERLAP", "120"))
+RAG_TOP_K = int(os.environ.get("RAG_TOP_K", "5"))
 
 # Celery
 CELERY_BROKER_URL = REDIS_URL
