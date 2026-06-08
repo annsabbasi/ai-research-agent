@@ -66,11 +66,25 @@ def run_research_task(self, query_id):
         batcher = TokenBatcher(lambda text: send_ws_token(query_id, text))
 
         from agent.graph import run_research
+        from documents.models import Document, DocumentChunk
+        from documents.retrieval import retrieve_from_documents
+
+        # Give the agent access to *this user's* documents (RAG), scoped so it
+        # can never retrieve anyone else's. Only offered if a corpus exists.
+        user_id = query.user_id
+        has_documents = DocumentChunk.objects.filter(
+            user_id=user_id, document__status=Document.Status.COMPLETED
+        ).exists()
+        retriever = (
+            (lambda q: retrieve_from_documents(q, user_id)) if has_documents else None
+        )
 
         result_state = run_research(
             query.question,
             status_callback=status_callback,
             token_callback=batcher.add,
+            retriever=retriever,
+            has_documents=has_documents,
         )
         batcher.flush()  # emit any tokens left in the buffer
 

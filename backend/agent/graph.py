@@ -4,6 +4,7 @@ from langgraph.graph import END, StateGraph
 
 from .nodes import analyze_node, format_node, plan_node, reflect_node, search_node
 from .streaming import set_token_sink
+from .tools import set_document_retriever
 
 
 class ResearchState(TypedDict, total=False):
@@ -20,6 +21,7 @@ class ResearchState(TypedDict, total=False):
     iteration: int                  # how many reflection rounds have run
     max_iterations: int             # hard cap on reflection rounds (cost guard)
     is_sufficient: bool             # reflection verdict on evidence completeness
+    has_documents: bool             # whether the user has a searchable corpus
     stage: str
     stage_detail: str
 
@@ -68,6 +70,8 @@ def run_research(
     question: str,
     status_callback=None,
     token_callback=None,
+    retriever=None,
+    has_documents: bool = False,
     max_iterations: int = 2,
 ) -> dict:
     """Run the agentic research graph.
@@ -78,14 +82,21 @@ def run_research(
             node so the caller can stream progress (e.g. over a WebSocket).
         token_callback: optional callable(delta) invoked for each token of the
             final report as it is generated, enabling live streaming to the UI.
+        retriever: optional callable(query) -> list[source dict] that searches
+            the requesting user's documents. Injected so the agent stays
+            decoupled from Django/DB.
+        has_documents: whether the user has a searchable document corpus; when
+            True the planner may route sub-queries to document retrieval.
         max_iterations: hard cap on reflection/search loops (cost + latency guard).
     """
     set_token_sink(token_callback)
+    set_document_retriever(retriever)
     graph = build_graph()
     initial_state: ResearchState = {
         "question": question,
         "iteration": 0,
         "max_iterations": max_iterations,
+        "has_documents": has_documents,
         "sub_queries": [],
         "pending_queries": [],
         "executed_queries": [],

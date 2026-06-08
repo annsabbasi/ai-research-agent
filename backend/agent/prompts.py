@@ -9,6 +9,18 @@ Example: ["query 1", "query 2", "query 3"]
 
 Return ONLY the JSON array, no other text."""
 
+PLAN_PROMPT_WITH_DOCS = """You are a research planning assistant. The user has their OWN uploaded documents available to search, in addition to the public web. Break the research question into 3-5 specific sub-queries, and for EACH sub-query choose the most appropriate source:
+- "documents": best answered from the user's own uploaded documents
+- "web": needs current or external information from the public web
+- "both": benefits from the user's documents AND the web
+
+Research Question: {question}
+
+Return ONLY a JSON array of objects, each shaped exactly as {{"query": "...", "source": "documents|web|both"}}.
+Example: [{{"query": "internal Q3 revenue figures", "source": "documents"}}, {{"query": "2024 industry benchmarks", "source": "web"}}]
+
+Return ONLY the JSON array, no other text."""
+
 REFLECT_PROMPT = """You are a meticulous research supervisor. Your job is to decide whether the evidence gathered so far is SUFFICIENT to write a thorough, well-grounded report answering the main question — or whether targeted follow-up searches are still needed.
 
 Main Question: {question}
@@ -70,4 +82,4 @@ What can we conclude from this research?
 ## Limitations
 What limitations exist in this research? What questions remain unanswered?
 
-Write in a professional, objective tone. Cite sources where relevant using [Source Title](url) format."""
+Write in a professional, objective tone. Cite web sources using [Source Title](url) format, and cite the user's uploaded documents by their title (e.g. "according to *Document Title*")."""
